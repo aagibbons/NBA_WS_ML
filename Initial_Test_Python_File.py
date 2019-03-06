@@ -9,3 +9,5 @@ def fun():
 for t in range(3):
     fun()
 
+for t in range(9):
+    print(t*t)
