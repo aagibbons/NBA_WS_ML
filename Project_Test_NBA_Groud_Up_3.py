@@ -188,13 +188,23 @@ def eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict):
                     continue
             predict = np.column_stack((predict, predict_check[:min(years_dict.values()), 0]))
             # ========================================
-    average_matrix_actual = np.zeros(min(years_dict.values()))
-    average_matrix_predicted = np.zeros(min(years_dict.values()))
-    for e in range(len(actual)):
-        average_matrix_actual[e] = np.mean(actual[:e+1, :])
-        average_matrix_predicted[e] = np.mean(predict[:e+1, :])
-        
-    return [average_matrix_actual, average_matrix_predicted]
+    evaluation_matrix = np.zeros((min(years_dict.values()), 5))
+    if np.shape(actual) != np.shape(predict):
+        print('ERROR! PROBLEM WITH THE DIMENTIONS EVALUATION MATRICES!')
+
+    for d in range(np.shape(actual)[0]):
+        if np.shape(actual)[1] == 1:
+            evaluation_matrix[d, 0] = actual[d, :]
+            evaluation_matrix[d, 1] = predict[d, :]
+        else:
+            evaluation_matrix[d, 0] = np.average(actual[d, :])
+            evaluation_matrix[d, 1] = np.average(predict[d, :])
+        evaluation_matrix[d, 2] = evaluation_matrix[d, 1] - evaluation_matrix[d, 0]
+        for e in range(np.shape(actual)[1]):
+            if predict[d, e] > actual[d, e]:
+                evaluation_matrix[d, 3] += 1
+        evaluation_matrix[d, 4] = evaluation_matrix[d, 3] / np.shape(actual[1])
+    return evaluation_matrix
 
 
 def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
@@ -214,24 +224,28 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
         predictions_matrix = rand_forest(train_features, test_features, train_labels, new_feature_list, runs,
                                          max_depth=max_depth)[0]
         years_dict = rand_years_select(features, feature_list)[1]
-        average_matrix_actual = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)[0]
-        average_matrix_predicted = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)[1]
+        evaluation_matrix = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)
+
         if t == 0:
-            pop_avg_matrix_actual = average_matrix_actual
-            pop_avg_matrix_predicted = average_matrix_predicted
+            avg_improvement = evaluation_matrix[:, 2]
+            pct_improvement = evaluation_matrix[:, 4]
         else:
-            pop_avg_matrix_actual = np.column_stack((pop_avg_matrix_actual, average_matrix_actual))
-            pop_avg_matrix_predicted = np.column_stack((pop_avg_matrix_predicted, average_matrix_predicted))
-    
-    if iterations == 1:
-        avg_pop_diff = pop_avg_matrix_predicted - pop_avg_matrix_actual
-    else:
-        avg_pop_diff = np.mean(pop_avg_matrix_predicted, 1)-np.mean(pop_avg_matrix_actual, 1)
-    print(avg_pop_diff[:5])
-    return [pop_avg_matrix_actual, pop_avg_matrix_predicted, avg_pop_diff]
+            avg_improvement = np.column_stack((avg_improvement, evaluation_matrix[:, 2]))
+            pct_improvement = np.column_stack((pct_improvement, evaluation_matrix[:, 4]))
+
+    final_eval = np.zeros((len(avg_improvement), 2))
+    for u in range(np.shape(avg_improvement)[0]):
+        if np.shape(avg_improvement)[1] == 1:
+            final_eval[u, 0] = avg_improvement[u, :]
+            final_eval[u, 1] = pct_improvement[u, :]
+        else:
+            final_eval[u, 0] = np.average(avg_improvement[u, :])
+            final_eval[u, 1] = np.average(pct_improvement[u, :])
+    print(final_eval)
+    return final_eval
 
 
-output = rand_forest_eval_1_main(5, 5, 2)
+output = rand_forest_eval_1_main(100, 5, 2)
 
 # print result of how long program takes to run
 print()
