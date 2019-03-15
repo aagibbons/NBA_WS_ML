@@ -14,6 +14,10 @@ from sklearn.ensemble import RandomForestRegressor
 # start timer to show how long program takes to run
 start_time = time.time()
 
+# set a random seed as to allow for the same trees obtained to be used on "lock box" set in future
+# also allows for repeatable results
+random.seed(0)
+
 
 # import data into numpy array and list of headings
 def get_features():
@@ -245,7 +249,18 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
     return final_eval
 
 
-output = rand_forest_eval_1_main(100, 5, 2)
+# parameters used
+iterations = 100
+runs = 5
+max_depth = 1
+
+# running the output
+output = rand_forest_eval_1_main(iterations, runs, max_depth)
+
+# creating file name then exporting results as .csv file
+filename = 'md-'+str(max_depth)+'_itr-'+str(iterations)+'_run-'+str(runs)+'.csv'
+export = pd.DataFrame(output, columns=['avg_improvement', 'pct_improvement'])
+export.to_csv(filename)
 
 # print result of how long program takes to run
 print()
