@@ -194,7 +194,7 @@ def eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict):
             # ========================================
     evaluation_matrix = np.zeros((min(years_dict.values()), 5))
     if np.shape(actual) != np.shape(predict):
-        print('ERROR! PROBLEM WITH THE DIMENTIONS EVALUATION MATRICES!')
+        print('ERROR! PROBLEM WITH THE DIMENSIONS EVALUATION MATRICES!')
 
     for d in range(np.shape(actual)[0]):
         if np.shape(actual)[1] == 1:
@@ -252,7 +252,7 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
 # parameters used
 iterations = 100
 runs = 5
-max_depth = 1
+max_depth = 7
 
 # running the output
 output = rand_forest_eval_1_main(iterations, runs, max_depth)
