@@ -110,7 +110,7 @@ def split_data(features, feature_list, test_years):
 
 # run the random forest model and report the predictions (can also optionally report the importances)
 def rand_forest(train_features, test_features, train_labels, new_feature_list, runs=1, n_estimators=1000,
-                max_depth=None, get_importances=False):
+                max_depth=None, max_features="auto", get_importances=False):
     
     sorted_importances = []
     
@@ -121,7 +121,8 @@ def rand_forest(train_features, test_features, train_labels, new_feature_list, r
         print(b)
 
         # Instantiate model with chosen parameters
-        rf = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, random_state=b)
+        rf = RandomForestRegressor(n_estimators=n_estimators, max_depth=max_depth, max_features=max_features,
+                                   random_state=b)
         
         # Train the model on training data
         rf.fit(train_features, train_labels)
@@ -211,7 +212,7 @@ def eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict):
     return evaluation_matrix
 
 
-def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
+def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, max_features="auto"):
 
     features = get_features()[0]
     feature_list = get_features()[1]
@@ -226,7 +227,7 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
         test_labels = split_data(features, feature_list, test_years)[3]
         new_feature_list = split_data(features, feature_list, test_years)[4]
         predictions_matrix = rand_forest(train_features, test_features, train_labels, new_feature_list, runs,
-                                         max_depth=max_depth)[0]
+                                         max_depth=max_depth, max_features=max_features)[0]
         years_dict = rand_years_select(features, feature_list)[1]
         evaluation_matrix = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)
 
@@ -252,13 +253,14 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None):
 # parameters used
 iterations = 100
 runs = 5
-max_depth = 7
+max_depth = 3
+max_features = "auto"
 
 # running the output
-output = rand_forest_eval_1_main(iterations, runs, max_depth)
+output = rand_forest_eval_1_main(iterations, runs, max_depth, max_features)
 
 # creating file name then exporting results as .csv file
-filename = 'md-'+str(max_depth)+'_itr-'+str(iterations)+'_run-'+str(runs)+'.csv'
+filename = 'md-'+str(max_depth)+'_mf-'+str(max_features)+'_itr-'+str(iterations)+'_run-'+str(runs)+'.csv'
 export = pd.DataFrame(output, columns=['avg_improvement', 'pct_improvement'])
 export.to_csv(filename)
 
