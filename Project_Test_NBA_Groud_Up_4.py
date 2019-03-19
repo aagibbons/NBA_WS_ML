@@ -269,24 +269,23 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, max_features="
     return [final_eval, avg_total_mse]
 
 
-for md in range(2, 6):
-    # parameters used
-    iterations = 100
-    runs = 5
-    max_depth = md
-    max_features = "sqrt"  # options: auto(default, =n_features), sqrt, log2, int, float(fraction)
+# parameters used
+iterations = 100
+runs = 5
+max_depth = None
+max_features = "auto"  # options: auto(default, =n_features), sqrt, log2, int, float(fraction)
 
-    # running the output
-    output = rand_forest_eval_1_main(iterations, runs, max_depth, max_features)
-    improvement_matrix = output[0]
-    avg_total_mse = output[1]
+# running the output
+output = rand_forest_eval_1_main(iterations, runs, max_depth, max_features)
+improvement_matrix = output[0]
+avg_total_mse = output[1]
 
-    # creating file name then exporting results as .csv file
-    filename = 'Ver-3.0_md-'+str(max_depth)+'_mf-'+str(max_features)+'_itr-'+str(iterations)+'_run-'+str(runs) +\
-               '_mae-'+str(avg_total_mse)+'.csv'
+# creating file name then exporting results as .csv file
+filename = 'Ver-3.0_md-'+str(max_depth)+'_mf-'+str(max_features)+'_itr-'+str(iterations)+'_run-'+str(runs) +\
+           '_mae-'+str(avg_total_mse)+'.csv'
 
-    export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement'])
-    export.to_csv(filename)
+export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement'])
+export.to_csv(filename)
 
 # print result of how long program takes to run
 print()
