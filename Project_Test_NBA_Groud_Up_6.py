@@ -180,15 +180,12 @@ def rand_forest(train_features, test_features, train_labels, new_feature_list, r
     return [predictions_matrix, sorted_importances]
 
 
-def lasso(train_features, test_features, train_labels, runs=1, alpha=1.0, tol=0.0001):
+def lasso(train_features, test_features, train_labels, test_labels, runs=1, alpha=1.0, tol=0.0001):
 
     for b in range(runs):
 
-        # to track progress of the program
-        print(b)
-
         # Instantiate model with chosen parameters
-        clf = linear_model.Lasso(alpha=alpha, max_iter=1000, tol=tol, random_state=b)
+        clf = linear_model.Lasso(alpha=alpha, max_iter=100000, tol=tol, random_state=b)
 
         # Train the model on training data
         clf.fit(train_features, train_labels)
@@ -196,21 +193,25 @@ def lasso(train_features, test_features, train_labels, runs=1, alpha=1.0, tol=0.
         # Use the forest's predict method on the test data
         predictions = clf.predict(test_features)
 
+        # calculate R^2
+        lasso_score = clf.score(test_features, test_labels)
+
         # build matrix to keep track of predictions
         if b == 0:
             predictions_matrix = np.array(predictions)
+            lasso_score_matrix = np.array(lasso_score)
         else:
             predictions_matrix = np.column_stack((predictions_matrix, predictions))
+            lasso_score_matrix = np.column_stack((lasso_score_matrix, lasso_score))
 
-        lasso_params = clf.get_params()
-        print(lasso_params)
+    lasso_score_avg = np.average(lasso_score_matrix)
 
-    return [predictions_matrix, lasso_params]
+    return [predictions_matrix, lasso_score_avg]
 
 
 # first version of the evaluation procedure. Returns performance of average objective outcome for the first nth picks
 def eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict):
-
+    print(np.average(predictions_matrix, axis=1))
     # calculate errors and root mean square error
     errors = (np.average(predictions_matrix, axis=1) - test_labels)**2
     rmse = (np.average(errors))**0.5
@@ -330,12 +331,73 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, min_samples_sp
     return [final_eval, avg_total_root_mean_square_error]
 
 
-for md in range(4, 7):
+def lasso_eval_1_main(iterations=1, runs=5, alpha=1.0, tol=0.0001):
+    output_get_features = get_features()
+    features = output_get_features[0]
+    feature_list = output_get_features[1]
+    for t in range(iterations):
+
+        output_rand_years_select = rand_years_select(features, feature_list)
+        test_years = output_rand_years_select[0]
+        output_split_data = split_data(features, feature_list, test_years)
+        train_features = output_split_data[0]
+        test_features = output_split_data[1]
+        train_labels = output_split_data[2]
+        test_labels = output_split_data[3]
+
+        # ========
+        output_lasso = lasso(train_features, test_features, train_labels, test_labels, runs=runs, alpha=alpha, tol=tol)
+        predictions_matrix = output_lasso[0]
+        lasso_score_avg = output_lasso[1]
+        # =====
+
+        years_dict = output_rand_years_select[1]
+        output_eval_procedure = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)
+        evaluation_matrix = output_eval_procedure[0]
+        root_mean_square_error = output_eval_procedure[1]
+
+        if t == 0:
+            avg_improvement = evaluation_matrix[:, 2]
+            pct_improvement = evaluation_matrix[:, 4]
+            total_root_mean_square_error = np.array(root_mean_square_error)
+            total_lasso_score_avg = np.array(lasso_score_avg)
+        else:
+            avg_improvement = np.column_stack((avg_improvement, evaluation_matrix[:, 2]))
+            pct_improvement = np.column_stack((pct_improvement, evaluation_matrix[:, 4]))
+            total_root_mean_square_error = np.append(total_root_mean_square_error, root_mean_square_error)
+            total_lasso_score_avg = np.append(total_lasso_score_avg, lasso_score_avg)
+
+    final_eval = np.zeros((len(avg_improvement), 2))
+    for u in range(np.shape(avg_improvement)[0]):
+        if len(np.shape(avg_improvement)) == 1:
+            final_eval[u, 0] = avg_improvement[u]
+            final_eval[u, 1] = pct_improvement[u]
+        else:
+            final_eval[u, 0] = np.average(avg_improvement[u, :])
+            final_eval[u, 1] = np.average(pct_improvement[u, :])
+    if iterations == 1:
+        avg_total_root_mean_square_error = total_root_mean_square_error
+        avg_total_lasso_score_avg = total_lasso_score_avg
+    else:
+        avg_total_root_mean_square_error = round(np.average(total_root_mean_square_error), 4)
+        avg_total_lasso_score_avg = round(np.average(total_lasso_score_avg), 4)
+    print(final_eval)
+    print(avg_total_root_mean_square_error)
+    print(avg_total_lasso_score_avg)
+    return [final_eval, avg_total_root_mean_square_error, avg_total_lasso_score_avg]
+
+
+# MODEL SELECT:
+rf = 1
+las = 0
+
+# run random forest model
+if rf == 1 and las == 0:
     # parameters used
-    iterations = 100
+    iterations = 10
     runs = 5
-    max_depth = md  # options: None or int
-    min_samples_split = 50  # options: int (min of 2, which is the default) or float(fraction)
+    max_depth = 6  # options: None or int
+    min_samples_split = 25  # options: int (min of 2, which is the default) or float(fraction)
     max_features = "auto"  # options: auto(default, =n_features), sqrt, log2, int, float(fraction)
 
     # running the output
@@ -348,7 +410,30 @@ for md in range(4, 7):
                str(iterations)+'_run-'+str(runs)+'_rmse-'+str(avg_total_root_mean_square_error)+'.csv'
 
     export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement'])
-    export.to_csv(filename)
+    #export.to_csv(filename)
+
+
+# run lasso regression model
+if las == 1 and rf == 0:
+    # parameters used (lasso)
+    iterations = 100
+    runs = 5
+    alpha = 0.13  # options: float. WARNING: do not set this to 0
+    tol = 0.000001
+
+    # running the output
+    output = lasso_eval_1_main(iterations, runs, alpha, tol)
+    improvement_matrix = output[0]
+    avg_total_root_mean_square_error = output[1]
+    avg_total_lasso_score_avg = output[2]
+
+    # creating file name then exporting results as .csv file
+    filename = 'Ver-L7.0_alpha-'+str(alpha)+'_tol-'+str(tol)+'_itr-'+str(iterations)+'_run-'+str(runs) +\
+               '_score-'+str(avg_total_lasso_score_avg)+'_rmse-'+str(avg_total_root_mean_square_error)+'.csv'
+
+    export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement'])
+    #export.to_csv(filename)
+
 
 # print result of how long program takes to run
 print()
