@@ -11,6 +11,8 @@ import pandas as pd
 import random
 import numpy as np
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.tree import export_graphviz
+import pydot
 
 # start timer to show how long program takes to run
 start_time = time.time()
@@ -111,7 +113,7 @@ def split_data(features, feature_list, test_years):
 
 # run the random forest model and report the predictions (can also optionally report the importances)
 def rand_forest(train_features, test_features, train_labels, new_feature_list, runs=1, n_estimators=1000,
-                max_depth=None, min_samples_split=2, max_features="auto", get_importances=False):
+                max_depth=None, min_samples_split=2, max_features="auto", get_importances=False, iteration=0):
     
     sorted_importances = []
     
@@ -145,6 +147,34 @@ def rand_forest(train_features, test_features, train_labels, new_feature_list, r
             # Label and sort the importances
             sorted_importances = np.column_stack((new_feature_list, importances))
             sorted_importances = np.flip(sorted_importances[sorted_importances[:, 1].argsort()], 0)
+
+        # create decision tree pictures, but only for first iteration, first run for the given parameters
+        if b == 0 and iteration == 0:
+
+            # Pull out three trees from the forest
+            tree1 = rf.estimators_[0]
+            tree2 = rf.estimators_[500]
+            tree3 = rf.estimators_[999]
+
+            # Export the image to a dot file
+            export_graphviz(tree1, out_file='tree1.dot', feature_names=new_feature_list, rounded=True, precision=1)
+            export_graphviz(tree2, out_file='tree2.dot', feature_names=new_feature_list, rounded=True, precision=1)
+            export_graphviz(tree3, out_file='tree3.dot', feature_names=new_feature_list, rounded=True, precision=1)
+
+            # Use dot file to create a graph
+            (graph1,) = pydot.graph_from_dot_file('tree1.dot')
+            (graph2,) = pydot.graph_from_dot_file('tree2.dot')
+            (graph3,) = pydot.graph_from_dot_file('tree3.dot')
+
+            # Create png file names to indicate parameters used
+            pic1 = 'md-'+str(max_depth)+'_mss-'+str(min_samples_split)+'_mf-'+str(max_features)+'_tree1.png'
+            pic2 = 'md-'+str(max_depth)+'_mss-'+str(min_samples_split)+'_mf-'+str(max_features)+'_tree2.png'
+            pic3 = 'md-'+str(max_depth)+'_mss-'+str(min_samples_split)+'_mf-'+str(max_features)+'_tree3.png'
+
+            # Write graph to a png file
+            graph1.write_png(pic1)
+            graph2.write_png(pic2)
+            graph3.write_png(pic3)
 
     return [predictions_matrix, sorted_importances]
 
@@ -237,7 +267,7 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, min_samples_sp
         new_feature_list = output_split_data[4]
         output_rand_forest = rand_forest(train_features, test_features, train_labels, new_feature_list, runs,
                                          max_depth=max_depth, min_samples_split=min_samples_split,
-                                         max_features=max_features)
+                                         max_features=max_features, iteration=t)
         predictions_matrix = output_rand_forest[0]
         years_dict = output_rand_years_select[1]
         output_eval_procedure = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)
@@ -271,25 +301,25 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, min_samples_sp
     return [final_eval, avg_total_root_mean_square_error]
 
 
-# parameters used
-iterations = 100
-runs = 5
-max_depth = None  # options: None or int
-min_samples_split = 2  # options: int (min of 2, which is the default) or float(fraction)
-max_features = "auto"  # options: auto(default, =n_features), sqrt, log2, int, float(fraction)
+for md in range(4, 7):
+    # parameters used
+    iterations = 100
+    runs = 5
+    max_depth = md  # options: None or int
+    min_samples_split = 50  # options: int (min of 2, which is the default) or float(fraction)
+    max_features = "auto"  # options: auto(default, =n_features), sqrt, log2, int, float(fraction)
 
-# running the output
-output = rand_forest_eval_1_main(iterations, runs, max_depth, min_samples_split, max_features)
-improvement_matrix = output[0]
-avg_total_root_mean_square_error = output[1]
+    # running the output
+    output = rand_forest_eval_1_main(iterations, runs, max_depth, min_samples_split, max_features)
+    improvement_matrix = output[0]
+    avg_total_root_mean_square_error = output[1]
 
-# creating file name then exporting results as .csv file
-filename = 'Ver-4.0_md-'+str(max_depth)+'_mss-'+str(min_samples_split)+'_mf-'+str(max_features)+'_itr-' +\
-           str(iterations)+'_run-'+str(runs)+'_rmse-'+str(avg_total_root_mean_square_error)+'.csv'
-print(filename)
+    # creating file name then exporting results as .csv file
+    filename = 'Ver-4.0_md-'+str(max_depth)+'_mss-'+str(min_samples_split)+'_mf-'+str(max_features)+'_itr-' +\
+               str(iterations)+'_run-'+str(runs)+'_rmse-'+str(avg_total_root_mean_square_error)+'.csv'
 
-export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement'])
-export.to_csv(filename)
+    export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement'])
+    export.to_csv(filename)
 
 # print result of how long program takes to run
 print()
