@@ -14,6 +14,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.tree import export_graphviz
 from sklearn import linear_model
 import pydot
+from sklearn.metrics import r2_score
 
 # start timer to show how long program takes to run
 start_time = time.time()
@@ -113,7 +114,7 @@ def split_data(features, feature_list, test_years):
 
 
 # run the random forest model and report the predictions (can also optionally report the importances)
-def rand_forest(train_features, test_features, train_labels, new_feature_list, runs=1, n_estimators=1000,
+def rand_forest(train_features, test_features, train_labels, test_labels, new_feature_list, runs=1, n_estimators=1000,
                 max_depth=None, min_samples_split=2, max_features="auto", get_importances=False, iteration=0):
     
     sorted_importances = []
@@ -134,12 +135,17 @@ def rand_forest(train_features, test_features, train_labels, new_feature_list, r
         # Use the forest's predict method on the test data
         predictions = rf.predict(test_features)
 
-        # build matrix to keep track of predictions
+        # calculate R^2
+        rf_r2_score = r2_score(test_labels, predictions)
+
+        # build matrix to keep track of predictions and r2 score
         if b == 0:
             predictions_matrix = np.array(predictions)
+            rf_r2_score_matrix = np.array(rf_r2_score)
         else:
             predictions_matrix = np.column_stack((predictions_matrix, predictions))
-    
+            rf_r2_score_matrix = np.column_stack((rf_r2_score_matrix, rf_r2_score))
+
         if get_importances:
         
             # Get numerical feature importances
@@ -177,7 +183,7 @@ def rand_forest(train_features, test_features, train_labels, new_feature_list, r
             graph2.write_png(pic2)
             graph3.write_png(pic3)
 
-    return [predictions_matrix, sorted_importances]
+    return [predictions_matrix, rf_r2_score_matrix, sorted_importances]
 
 
 def lasso(train_features, test_features, train_labels, test_labels, runs=1, alpha=1.0, tol=0.0001):
@@ -196,7 +202,7 @@ def lasso(train_features, test_features, train_labels, test_labels, runs=1, alph
         # calculate R^2
         lasso_score = clf.score(test_features, test_labels)
 
-        # build matrix to keep track of predictions
+        # build matrix to keep track of predictions and r2 score
         if b == 0:
             predictions_matrix = np.array(predictions)
             lasso_score_matrix = np.array(lasso_score)
@@ -301,14 +307,15 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, min_samples_sp
         train_labels = output_split_data[2]
         test_labels = output_split_data[3]
         new_feature_list = output_split_data[4]
-        output_rand_forest = rand_forest(train_features, test_features, train_labels, new_feature_list, runs,
-                                         max_depth=max_depth, min_samples_split=min_samples_split,
+        output_rand_forest = rand_forest(train_features, test_features, train_labels, test_labels, new_feature_list,
+                                         runs, max_depth=max_depth, min_samples_split=min_samples_split,
                                          max_features=max_features, iteration=t)
         predictions_matrix = output_rand_forest[0]
         years_dict = output_rand_years_select[1]
         output_eval_procedure = eval_procedure_1(test_labels, test_years, predictions_matrix, years_dict)
         evaluation_matrix = output_eval_procedure[0]
         root_mean_square_error = output_eval_procedure[1]
+        rf_r2_score = output_rand_forest[1]
         print(root_mean_square_error)
 
         if t == 0:
@@ -316,11 +323,13 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, min_samples_sp
             pct_improvement = evaluation_matrix[:, 4]
             pct_worse = evaluation_matrix[:, 6]
             total_root_mean_square_error = np.array(root_mean_square_error)
+            avg_rf_r2_score = np.array(rf_r2_score)
         else:
             avg_improvement = np.column_stack((avg_improvement, evaluation_matrix[:, 2]))
             pct_improvement = np.column_stack((pct_improvement, evaluation_matrix[:, 4]))
             pct_worse = np.column_stack((pct_worse, evaluation_matrix[:, 6]))
             total_root_mean_square_error = np.append(total_root_mean_square_error, root_mean_square_error)
+            avg_rf_r2_score = np.append(avg_rf_r2_score, rf_r2_score)
 
     final_eval = np.zeros((len(avg_improvement), 3))
     for u in range(np.shape(avg_improvement)[0]):
@@ -334,12 +343,15 @@ def rand_forest_eval_1_main(iterations=1, runs=5, max_depth=None, min_samples_sp
             final_eval[u, 2] = np.average(pct_worse[u, :])
     if iterations == 1:
         avg_total_root_mean_square_error = total_root_mean_square_error
+        total_avg_rf_r2_score = avg_rf_r2_score
     else:
         avg_total_root_mean_square_error = round(np.average(total_root_mean_square_error), 4)
+        total_avg_rf_r2_score = round(np.average(avg_rf_r2_score), 4)
     print(final_eval)
     print(avg_total_root_mean_square_error)
+    print(total_avg_rf_r2_score)
 
-    return [final_eval, avg_total_root_mean_square_error]
+    return [final_eval, avg_total_root_mean_square_error, total_avg_rf_r2_score]
 
 
 def lasso_eval_1_main(iterations=1, runs=5, alpha=1.0, tol=0.0001):
@@ -410,7 +422,7 @@ las = 0
 # run random forest model
 if rf == 1 and las == 0:
     # parameters used
-    iterations = 3
+    iterations = 100
     runs = 5
     max_depth = 6  # options: None or int
     min_samples_split = 25  # options: int (min of 2, which is the default) or float(fraction)
