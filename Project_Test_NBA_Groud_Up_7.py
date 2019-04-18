@@ -146,6 +146,7 @@ def rand_forest(train_features, test_features, train_labels, new_feature_list, r
             # Label and sort the importances
             sorted_importances = np.column_stack((new_feature_list, importances))
             sorted_importances = np.flip(sorted_importances[sorted_importances[:, 1].argsort()], 0)
+            print(sorted_importances)
 
         # toggle to turn off tree figure creation
         export_trees = 0
@@ -551,6 +552,7 @@ def ensemble_eval_1_main(iterations=1, runs_rf=5, max_depth=None, min_samples_sp
                                 (weight_lr / total_weight) * predictions_matrix_en[e, 2]
 
         # evaluate predictions
+        ensemble_r2_score = r2_score(test_labels, predictions_en)
         output_eval_procedure = eval_procedure_1(test_labels, test_years, predictions_en, years_dict)
         evaluation_matrix = output_eval_procedure[0]
         root_mean_square_error = output_eval_procedure[1]
@@ -561,11 +563,13 @@ def ensemble_eval_1_main(iterations=1, runs_rf=5, max_depth=None, min_samples_sp
             pct_improvement = evaluation_matrix[:, 4]
             pct_worse = evaluation_matrix[:, 6]
             total_root_mean_square_error = np.array(root_mean_square_error)
+            ensemble_r2_score_array = np.array(ensemble_r2_score)
         else:
             avg_improvement = np.column_stack((avg_improvement, evaluation_matrix[:, 2]))
             pct_improvement = np.column_stack((pct_improvement, evaluation_matrix[:, 4]))
             pct_worse = np.column_stack((pct_worse, evaluation_matrix[:, 6]))
             total_root_mean_square_error = np.append(total_root_mean_square_error, root_mean_square_error)
+            ensemble_r2_score_array = np.append(ensemble_r2_score_array, ensemble_r2_score)
     final_eval = np.zeros((len(avg_improvement), 3))
     for u in range(np.shape(avg_improvement)[0]):
         if len(np.shape(avg_improvement)) == 1:
@@ -578,10 +582,13 @@ def ensemble_eval_1_main(iterations=1, runs_rf=5, max_depth=None, min_samples_sp
             final_eval[u, 2] = np.average(pct_worse[u, :])
     if iterations == 1:
         avg_total_root_mean_square_error = total_root_mean_square_error
+        average_ensemble_r2_score = ensemble_r2_score_array
     else:
         avg_total_root_mean_square_error = round(np.average(total_root_mean_square_error), 4)
+        average_ensemble_r2_score = round(np.average(ensemble_r2_score_array), 4)
     print(final_eval)
     print(avg_total_root_mean_square_error)
+    print('R2:', average_ensemble_r2_score)
 
     return [final_eval, avg_total_root_mean_square_error]
 
@@ -594,7 +601,7 @@ lr = 1
 # run random forest model
 if rf == 1 and las == 0 and lr == 0:
     # parameters used (random forest)
-    iterations = 3
+    iterations = 5
     runs = 5
     max_depth = 6  # options: None or int
     min_samples_split = 25  # options: int (min of 2, which is the default) or float(fraction)
@@ -616,7 +623,7 @@ if rf == 1 and las == 0 and lr == 0:
 # run lasso regression model
 if las == 1 and rf == 0 and lr == 0:
     # parameters used (lasso)
-    iterations = 1
+    iterations = 100
     runs = 5
     alpha = 0.13  # options: float. WARNING: do not set this to 0
     tol = 0.000001
@@ -648,9 +655,9 @@ if lr == 1 and las == 0 and rf == 0:
 # run ensemble
 if lr == 1 and las == 1 and rf == 1:
     # parameters used (general)
-    iterations = 2
-    weight_rf = 1  # ensemble prediction weight on random forest prediction
-    weight_las = 1  # ensemble prediction weight on lasso prediction
+    iterations = 100
+    weight_rf = 2  # ensemble prediction weight on random forest prediction
+    weight_las = 3  # ensemble prediction weight on lasso prediction
     weight_lr = 1  # ensemble prediction weight on linear regression prediction
 
     # parameters used (random forest)
@@ -671,13 +678,13 @@ if lr == 1 and las == 1 and rf == 1:
     avg_total_root_mean_square_error = output[1]
 
     # creating file name then exporting results as .csv file
-    filename = 'Ver-E8.0_iter-' + str(iterations) + '_runs_rf-' + str(runs_rf) + '_md-' + str(max_depth) + '_mss-' + \
+    filename = 'Ver-E-POS_C-11.0_iter-' + str(iterations) + '_runs_rf-' + str(runs_rf) + '_md-' + str(max_depth) + '_mss-' + \
                str(min_samples_split) + '_mf-' + str(max_features) + '_runs_las-' + str(runs_las) + '_alpha-' + \
                str(alpha) + '_tol-' + str(tol) + '_w_rf-' + str(weight_rf) + '_w_las-' + str(weight_las) + '_w_lr-' + \
                str(weight_lr) + '_rmse-' + str(avg_total_root_mean_square_error) + '.csv'
 
     export = pd.DataFrame(improvement_matrix, columns=['avg_improvement', 'pct_improvement', 'pct_worse'])
-    # export.to_csv(filename)
+    export.to_csv(filename)
 
 # print result of how long program takes to run
 print()
