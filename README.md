@@ -12,9 +12,9 @@ An alternate, ongoing approach is to only include players who have a positive va
 
 The files found here were used for the following research paper:
 
-Using Machine Learning to Predict NBA Success
+<b>Using Machine Learning to Predict NBA Success</b>
 
-Aidan Gibbons
+Aidan Gibbons,
 University of Toronto
 
 Abstract
